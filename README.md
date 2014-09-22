@@ -5,4 +5,4 @@ The tBeat library manages recurring function calls based on a period. The librar
 
 ## The tBeatCore Class
 
-This class is the only class in this library. An instance of it named *tBeat* is declared in *tBeat.h* and *tBeat.cpp*. You shall not instanciate another tBeatCore instance. tBeatCore contains a struct named tBeatHook used internally. For simplification purpose, creating a new hook odesn't require the instanciation of a tBeatHook struct, making the library more usable.
+This class is the only class in this library. An instance of it named *tBeat* is declared in *tBeat.h* and *tBeat.cpp*. You shall not instanciate another tBeatCore instance. tBeatCore contains a struct named tBeatHook used internally. For simplification purpose, creating a new hook doesn't require the instanciation of a tBeatHook struct, making the library more usable.
