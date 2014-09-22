@@ -1,3 +1,23 @@
+// Copyright (c) 2014 Benoît Roehr <benoit.roehr@gmail.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 #ifndef TBEAT_h
 #define TBEAT_h
 
@@ -65,8 +85,7 @@
 extern "C" void TBEAT_TIMERn_CAPT_vect(void)  __attribute__ ((signal));
 //declaring the ISR as an extern function, will be friend with tBeatCore class
 
-class tBeatCore
-{
+class tBeatCore {
 public:
   typedef void (*fptr)();//function pointer
 
@@ -100,8 +119,7 @@ public:
   int16_t globalCount;
 
 private:
-  struct Hook
-  {
+  struct Hook {
     //default constructor
     Hook(void):
       period(0),
@@ -114,13 +132,11 @@ private:
       count(count),
       callback(callback) {}
 
-    bool operator!=(const Hook &x) const
-    {
+    bool operator!=(const Hook& x) const {
       return ((period != x.period) || (callback != x.callback));
     }
 
-    bool operator==(const Hook &x) const
-    {
+    bool operator==(const Hook& x) const {
       return ((period == x.period) && (callback == x.callback));
     }
 
@@ -129,9 +145,9 @@ private:
     fptr callback;
   };
 
-  uint8_t _seekHook(const Hook &hook);
-  void _registerHook(Hook const &hook);
-  void _deleteHook(Hook const &hook);
+  uint8_t _seekHook(const Hook& hook);
+  void _registerHook(Hook const& hook);
+  void _deleteHook(Hook const& hook);
 
   Hook _hookData[TBEAT_HOOK_STACK_SIZE];
   uint8_t _hookSize;
