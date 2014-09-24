@@ -22,16 +22,93 @@
 #include "tBeat.h"
 
 #define LED 13
+#define LED2 6
 
-int period = 200;
+const int slowPeriod = 500;
+const int fastPeriod = 250;
+int period = slowPeriod;
 
 void ledOn();
 void ledOff();
+void led2On();
+void led2Off();
 void modifyPeriod();
 void pause2Sec();
+void printHook(uint8_t idx);
+void printHooks();
+void printError();
+
+tBeatHook ledOnHook(ledOn, period, period, true, true, false);
+tBeatHook ledOffHook(ledOff, 10, 10, false, false, false);
+tBeatHook syncChecker(led2On, 2000);
+tBeatHook led2OffHook(led2Off, 10, 10, false, false, false);
+tBeatHook modPeriodHook(modifyPeriod, 2000, 1980);
+tBeatHook pause2secHook(pause2Sec, 1000, 999, false, true, false);
+tBeatHook getError(printError, 1000, 1100);
+
+void led2On() {
+  digitalWrite(LED2, 1);
+  led2OffHook.enable();
+}
+
+void led2Off() {
+  digitalWrite(LED2, 0);
+  led2OffHook.disable();
+}
+
+void printError() {
+  for (uint8_t idx = 0; idx < tBeat._hookSize; idx++) {
+    bool warn = tBeat._hookList[idx]->getWarning();
+    bool err = tBeat._hookList[idx]->getError();
+    Serial.print("hook");
+    Serial.print(idx);
+    Serial.print("| Warning: ");
+    Serial.print(warn);
+    Serial.print("| Error: ");
+    Serial.println(err);
+    if (err || warn) {
+      tBeat.pause();
+      printHook(idx);
+      tBeat.start();
+    }
+  }
+}
+
+void printHook(uint8_t idx) {
+  Serial.print("Hook"); Serial.print(idx);
+  Serial.print(" ");
+
+  Serial.print("| fptr: "); Serial.print((int)tBeat._hookList[idx]->callback, HEX);
+  Serial.print(" ");
+
+  Serial.print("| period: "); Serial.print(tBeat._hookList[idx]->period);
+  Serial.print(" ");
+
+  Serial.print("| count: "); Serial.print(tBeat._hookList[idx]->count);
+  Serial.print(" ");
+
+  Serial.print("| isEn: "); Serial.print((int)tBeat._hookList[idx]->isEnabled());
+  Serial.print(" ");
+
+  Serial.print("| isLoop: "); Serial.print((int)tBeat._hookList[idx]->isLooped());
+  Serial.print(" ");
+
+  Serial.print("| inter: "); Serial.print((int)tBeat._hookList[idx]->isInterrupt());
+  Serial.println(" |");
+}
+
+void printHooks() {
+  for (uint8_t idx = 0; idx < tBeat._hookSize; idx++) {
+    printHook(idx);
+  }
+}
 
 void setup() {
+  delay(5000);
+  printHooks();
+
   pinMode(LED, OUTPUT);
+  pinMode(LED2, OUTPUT);
 
   /*============================================================================
   The init function will set the base period. An interrupt event will occure
@@ -47,14 +124,15 @@ void setup() {
   be called every 1 seconds. One of the limit of tBeat is that the callback
   function MUST be in the global scope.
   ============================================================================*/
-  tBeat.newHook(period, ledOn);
-  tBeat.newHook(2000, modifyPeriod);
+  //  tBeat.registerHook(ledOnHook);
+  //  tBeat.registerHook(modPeriodHook);
+  //  tBeat.registerHook(pause2secHook);
 
   /*============================================================================
   By default, the initial count of a newHook is set equal to the period. If you
   want, you can set the inital count yourself. Here, the inital count is 989ms.
   ============================================================================*/
-  tBeat.newHook(10000, 989, pause2Sec);
+  //  tBeat.newHook(10000, 989, pause2Sec, true);
 
   /*============================================================================
   When initializing tBeat, the hardware timer is never started automaticaly, you
@@ -115,7 +193,7 @@ void ledOn() {
   of functions. globalCount is not used in the engine so you can write and read
   on it at will.
   ============================================================================*/
-  tBeat.newHook(10, ledOff);
+  ledOffHook.enable();
 }
 
 void ledOff() {
@@ -125,22 +203,20 @@ void ledOff() {
   killHook removes a hook from the list based on its period and callback
   pointer.
   ============================================================================*/
-  tBeat.killHook(10, ledOff);
 }
 
 void modifyPeriod() {
-  int last_period = period;
-  if (period == 200) {
-    period = 100;
+  if (period == slowPeriod) {
+    period = fastPeriod;
   }
   else {
-    period = 200;
+    period = slowPeriod;
   }
   /*============================================================================
     modifyHook modifies the period of a hook based on its initial period and
     callback pointer.
   ============================================================================*/
-  tBeat.modifyHook(last_period, ledOn, period);
+  ledOnHook.period = period;
 }
 
 void pause2Sec() {

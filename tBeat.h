@@ -78,16 +78,21 @@
 #define TBEAT_TIMERn_CAPT_vect TIMER3_CAPT_vect
 #endif
 
-//==============================================================================
-// tBeatCore class
-//==============================================================================
+struct tBeatHook;
 
 extern "C" void TBEAT_TIMERn_CAPT_vect(void)  __attribute__ ((signal));
 //declaring the ISR as an extern function, will be friend with tBeatCore class
 
+//==============================================================================
+// tBeatCore class
+//==============================================================================
 class tBeatCore {
 public:
-  typedef void (*fptr)();//function pointer
+  tBeatCore() {
+    for (uint8_t idx = 0; idx < TBEAT_HOOK_STACK_SIZE; idx++) {
+      _hookList[idx] = NULL;
+    }
+  }
 
   //tBeat hardware timer commands
   void init();
@@ -97,64 +102,149 @@ public:
   //tBeat execute, must be called in main loop()
   void exec();
 
-  //hook attribution
-  void newHook(int16_t period, fptr callback);
-  void newHook(int16_t period, int16_t initialCount, fptr callback);
-
-  void modifyHook(int16_t period,
-                  fptr callback,
-                  int16_t newPeriod,
-                  int16_t initialCount);
-
-  void modifyHook(int16_t period,
-                  fptr callback,
-                  int16_t newPeriod);
-
-  void killHook(int16_t period, fptr callback);
-
-  //declaring the ISR vector as a public friend of the class
-  friend void TBEAT_TIMERn_CAPT_vect();
-
-  //tBeat internal counter
+  //tBeat internal counter (overflows)
   int16_t globalCount;
-
-private:
-  struct Hook {
-    //default constructor
-    Hook(void):
-      period(0),
-      count(0),
-      callback(NULL) {}
-
-    //constructor with parameters
-    Hook(int16_t period, int16_t count, fptr callback):
-      period(period),
-      count(count),
-      callback(callback) {}
-
-    bool operator!=(const Hook& x) const {
-      return ((period != x.period) || (callback != x.callback));
-    }
-
-    bool operator==(const Hook& x) const {
-      return ((period == x.period) && (callback == x.callback));
-    }
-
-    int16_t period;
-    int16_t count;
-    fptr callback;
-  };
-
-  uint8_t _seekHook(const Hook& hook);
-  void _registerHook(Hook const& hook);
-  void _deleteHook(Hook const& hook);
-
-  Hook _hookData[TBEAT_HOOK_STACK_SIZE];
+  uint8_t interruptTime;
   uint8_t _hookSize;
+  tBeatHook* _hookList[TBEAT_HOOK_STACK_SIZE];
 
-  uint8_t _elapsed;
+  //hookList Management
+  void registerHook(tBeatHook& hook);
+
+  void _executeHook(uint8_t idx);
+  uint8_t _seekHook(const tBeatHook& hook);
 };
 
 extern tBeatCore tBeat;
+
+//==============================================================================
+// tBeatHook structure
+//==============================================================================
+struct tBeatHook {
+public:
+  friend void TBEAT_TIMERn_CAPT_vect();
+  friend class tBeatCore;
+
+  //private:
+  typedef void (*fptr)();
+  fptr callback;
+  /*============================================================================
+  status byte description:
+  bit:
+        0: isEnabled  R/W
+        1: isLooped   R/W
+        2: interrupt  R/W
+        3: warning    R
+        4: error      R
+        5: custom0    R/W
+        6: custom1    R/W
+        7: custom2    R/W
+  ============================================================================*/
+  uint8_t status;
+
+  /*============================================================================
+  Constructors
+  ============================================================================*/
+  tBeatHook(void):
+    callback(NULL),
+    period(0),
+    count(-1),
+    status(0) {}
+  tBeatHook(fptr callback,
+            int16_t period,
+            int16_t initialCount = -1,
+            bool isEnabled = true,
+            bool isLooped = true,
+            bool isInterrupt = false):
+    callback(callback),
+    period(period),
+    count((initialCount >= 0) ? initialCount : period),
+    status((uint8_t)(isEnabled | (isLooped << 1) | (isInterrupt << 2))) {
+    tBeat.registerHook(*this);
+  }
+  int16_t period;
+  int16_t count;
+
+  /*============================================================================
+  Warning and errors
+  ============================================================================*/
+  inline bool getWarning() {
+    bool ret = status & 0x01 << 3;
+    status &= ~(0x01 << 3);
+    return ret;
+  }
+  inline void setWarning() {
+    status |= 0x01 << 3;
+  }
+  inline bool getError() {
+    bool ret = status & 0x01 << 4;
+    status &= ~(0x01 << 4);
+    return ret;
+  }
+  inline void setError() {
+    status |= 0x01 << 4;
+  }
+
+  /*============================================================================
+  Enable and disable
+  ============================================================================*/
+  inline bool isEnabled() {
+    return status & 0x01 << 0;
+  }
+  inline void enable() {
+    status |= 0x01 << 0;
+  }
+  inline void disable() {
+    status &= ~(0x01 << 0);
+  }
+
+  /*============================================================================
+  Looping and one shot
+  ============================================================================*/
+  inline bool isLooped() {
+    return status & 0x01 << 1;
+  }
+  inline void setLooped() {
+    status |= 0x01 << 1;
+  }
+  inline void clrLooped() {
+    status &= ~(0x01 << 1);
+  }
+
+  /*============================================================================
+  Interrupt
+  ============================================================================*/
+  inline bool isInterrupt() {
+    return status & 0x01 << 2;
+  }
+  inline void setInterrupt() {
+    status |= 0x01 << 2;
+  }
+  inline void clrInterrupt() {
+    status &= ~(0x01 << 2);
+  }
+
+  /*============================================================================
+  periodChange
+  ============================================================================*/
+  void setPeriod(int16_t newPeriod, int16_t initialCount = -1) {
+    if (initialCount == -1) {
+      initialCount = newPeriod;
+    }
+    period = newPeriod;
+    count = initialCount;
+  }
+
+  /*============================================================================
+  Operators overload
+  ============================================================================*/
+  bool operator==(const tBeatHook& x) const {
+    return ((period == x.period) && (callback == x.callback));
+  }
+
+  bool operator!=(const tBeatHook& x) const {
+    return !(*this == x);
+  }
+};
 
 #endif //whole file
